@@ -63,6 +63,19 @@ jobs:
       - name: Install packages
         working-directory: hum-desktop
         run: npm ci
+      - name: Write the release config
+        working-directory: hum-desktop
+        shell: bash
+        env:
+          HUM_UPDATER_PUBKEY: ${{ secrets.HUM_UPDATER_PUBKEY }}
+        run: |
+          node -e "
+            const fs = require('fs');
+            const conf = JSON.parse(fs.readFileSync('src-tauri/tauri.release.conf.json', 'utf8'));
+            const pubkey = process.env.HUM_UPDATER_PUBKEY.replace(/\s+/g, '');
+            conf.plugins = { ...conf.plugins, updater: { ...conf.plugins?.updater, pubkey } };
+            fs.writeFileSync('src-tauri/tauri.ci.conf.json', JSON.stringify(conf, null, 2));
+          "
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -80,4 +93,4 @@ jobs:
           releaseDraft: true
           prerelease: false
           includeUpdaterJson: true
-          args: ${{ matrix.args }} --config src-tauri/tauri.release.conf.json
+          args: ${{ matrix.args }} --config src-tauri/tauri.ci.conf.json
