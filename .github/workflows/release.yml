@@ -1,0 +1,83 @@
+# Author: t.mccall
+# Created Date: 2026-11-14
+# Last Revision: 2026-11-14 by t.mccall
+# Called by: none
+
+name: Release Hum
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Branch or tag of the Hum source to build
+        default: main
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            name: windows
+            args: ''
+          - os: macos-latest
+            name: macos-universal
+            args: --target universal-apple-darwin
+          - os: ubuntu-22.04
+            name: linux
+            args: --bundles deb,rpm,appimage
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Check secrets
+        shell: bash
+        env:
+          SOURCE: ${{ secrets.HUM_SOURCE_TOKEN }}
+          KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          PUB: ${{ secrets.HUM_UPDATER_PUBKEY }}
+        run: |
+          if [ -z "$SOURCE" ] || [ -z "$KEY" ] || [ -z "$PUB" ]; then
+            echo "::error::Add the HUM_SOURCE_TOKEN, TAURI_SIGNING_PRIVATE_KEY and HUM_UPDATER_PUBKEY secrets to this repository first"
+            exit 1
+          fi
+      - uses: actions/checkout@v4
+        with:
+          repository: TylerCodesTech/Hum
+          ref: ${{ inputs.ref }}
+          token: ${{ secrets.HUM_SOURCE_TOKEN }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.name == 'macos-universal' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+      - name: Linux dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev
+      - name: Install packages
+        working-directory: hum-desktop
+        run: npm ci
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          HUM_UPDATER_PUBKEY: ${{ secrets.HUM_UPDATER_PUBKEY }}
+        with:
+          projectPath: hum-desktop
+          owner: TylerCodesTech
+          repo: Hum-releases
+          releaseCommitish: ${{ github.sha }}
+          tagName: hum-v__VERSION__
+          releaseName: Hum __VERSION__
+          releaseBody: Download the installer for your computer below. Copies of Hum that are already installed update themselves.
+          releaseDraft: true
+          prerelease: false
+          includeUpdaterJson: true
+          args: ${{ matrix.args }} --config src-tauri/tauri.release.conf.json
