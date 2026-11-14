@@ -4,6 +4,7 @@
 # Called by: release.yml
 
 name: Publish release
+run-name: Publish ${{ inputs.tag }}
 
 on:
   workflow_call:

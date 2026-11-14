@@ -4,6 +4,7 @@
 # Called by: publish.yml
 
 name: Update Homebrew cask
+run-name: Update Homebrew cask for ${{ inputs.tag || github.event.release.tag_name }}
 
 on:
   release:

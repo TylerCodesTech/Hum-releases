@@ -4,10 +4,14 @@
 # Called by: none
 
 name: Release Hum
+run-name: ${{ inputs.version && format('Release Hum {0}', inputs.version) || format('Release Hum from {0}', inputs.ref) }}
 
 on:
   workflow_dispatch:
     inputs:
+      version:
+        description: Version being released, such as 2026.2.0 (shown as the run's title and checked against the source)
+        default: ''
       ref:
         description: Branch or tag of the Hum source to build
         default: main
@@ -26,10 +30,15 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.HUM_SOURCE_TOKEN }}
           REF: ${{ inputs.ref }}
+          EXPECTED: ${{ inputs.version }}
         run: |
           version="$(gh api "repos/TylerCodesTech/Hum/contents/hum-desktop/package.json?ref=${REF}" -H 'Accept: application/vnd.github.raw' | jq -r .version)"
           if [ -z "$version" ] || [ "$version" = "null" ]; then
             echo "::error::Could not read the version from the Hum source"
+            exit 1
+          fi
+          if [ -n "$EXPECTED" ] && [ "$EXPECTED" != "$version" ]; then
+            echo "::error::You asked to release $EXPECTED but the Hum source is at $version"
             exit 1
           fi
           echo "tag=hum-v${version}" >> "$GITHUB_OUTPUT"
