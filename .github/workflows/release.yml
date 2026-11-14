@@ -113,7 +113,7 @@ jobs:
           projectPath: hum-desktop
           owner: TylerCodesTech
           repo: Hum-releases
-          releaseCommitish: ${{ github.sha }}
+          releaseCommitish: main
           tagName: hum-v__VERSION__
           releaseName: Hum __VERSION__
           releaseBody: Download the installer for your computer below. Copies of Hum that are already installed update themselves.
