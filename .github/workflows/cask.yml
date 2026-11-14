@@ -33,12 +33,19 @@ jobs:
           ref: main
       - name: Write the cask
         env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
           TAG: ${{ inputs.tag || github.event.release.tag_name }}
         run: |
           version="${TAG#hum-v}"
-          curl -fL --retry 3 -o "$RUNNER_TEMP/hum.dmg" "https://github.com/TylerCodesTech/Hum-releases/releases/download/${TAG}/Hum_${version}_universal.dmg"
-          sha="$(sha256sum "$RUNNER_TEMP/hum.dmg" | cut -d' ' -f1)"
-          scripts/write-cask.sh "$version" "$sha"
+          dmg="$(gh release view "$TAG" --json assets --jq '.assets[].name' | grep -E '\.dmg$' | head -n 1)"
+          if [ -z "$dmg" ]; then
+            echo "::error::The release $TAG has no .dmg file"
+            exit 1
+          fi
+          gh release download "$TAG" --pattern "$dmg" --dir "$RUNNER_TEMP"
+          sha="$(sha256sum "$RUNNER_TEMP/$dmg" | cut -d' ' -f1)"
+          scripts/write-cask.sh "$version" "$sha" "https://github.com/TylerCodesTech/Hum-releases/releases/download/${TAG}/${dmg}"
       - name: Commit the cask
         run: |
           git config user.name "Tyler McCall"

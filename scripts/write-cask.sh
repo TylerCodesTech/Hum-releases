@@ -8,6 +8,7 @@ set -euo pipefail
 
 version="$1"
 sha="$2"
+url="$3"
 
 mkdir -p Casks
 cat > Casks/hum.rb <<CASK
@@ -15,7 +16,7 @@ cask "hum" do
   version "${version}"
   sha256 "${sha}"
 
-  url "https://github.com/TylerCodesTech/Hum-releases/releases/download/hum-v#{version}/Hum_#{version}_universal.dmg"
+  url "${url}"
   name "Hum"
   desc "Editor for Symitar PowerOn with AI chat and spec task lists"
   homepage "https://github.com/TylerCodesTech/Hum-releases"

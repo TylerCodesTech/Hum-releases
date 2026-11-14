@@ -10,8 +10,12 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: Version being released, such as 2026.2.0 (shown as the run's title and checked against the source)
+        description: Version being released, such as 2026.2.1.0 (shown as the run's title and checked against the source)
         default: ''
+      publish:
+        description: Publish the release when every build succeeds (turn off to leave a draft)
+        type: boolean
+        default: true
       ref:
         description: Branch or tag of the Hum source to build
         default: main
@@ -24,6 +28,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       tag: ${{ steps.version.outputs.tag }}
+      shown: ${{ steps.version.outputs.shown }}
     steps:
       - name: Read the version
         id: version
@@ -32,16 +37,20 @@ jobs:
           REF: ${{ inputs.ref }}
           EXPECTED: ${{ inputs.version }}
         run: |
-          version="$(gh api "repos/TylerCodesTech/Hum/contents/hum-desktop/package.json?ref=${REF}" -H 'Accept: application/vnd.github.raw' | jq -r .version)"
-          if [ -z "$version" ] || [ "$version" = "null" ]; then
+          stored="$(gh api "repos/TylerCodesTech/Hum/contents/hum-desktop/package.json?ref=${REF}" -H 'Accept: application/vnd.github.raw' | jq -r .version)"
+          if ! [[ "$stored" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             echo "::error::Could not read the version from the Hum source"
             exit 1
           fi
-          if [ -n "$EXPECTED" ] && [ "$EXPECTED" != "$version" ]; then
-            echo "::error::You asked to release $EXPECTED but the Hum source is at $version"
+          IFS=. read -r year major packed <<< "$stored"
+          shown="${year}.${major}.$((packed / 1000)).$((packed % 1000))"
+          if [ -n "$EXPECTED" ] && [ "$EXPECTED" != "$shown" ]; then
+            echo "::error::You asked to release $EXPECTED but the Hum source is at $shown"
             exit 1
           fi
-          echo "tag=hum-v${version}" >> "$GITHUB_OUTPUT"
+          echo "Releasing Hum $shown (stored as $stored)"
+          echo "shown=${shown}" >> "$GITHUB_OUTPUT"
+          echo "tag=hum-v${shown}" >> "$GITHUB_OUTPUT"
   release:
     needs: prepare
     strategy:
@@ -114,8 +123,9 @@ jobs:
           owner: TylerCodesTech
           repo: Hum-releases
           releaseCommitish: main
-          tagName: hum-v__VERSION__
-          releaseName: Hum __VERSION__
+          tagName: ${{ needs.prepare.outputs.tag }}
+          releaseName: Hum ${{ needs.prepare.outputs.shown }}
+          assetNamePattern: Hum_${{ needs.prepare.outputs.shown }}_[platform]_[arch][setup][ext]
           releaseBody: Download the installer for your computer below. Copies of Hum that are already installed update themselves.
           releaseDraft: true
           prerelease: false
@@ -126,3 +136,4 @@ jobs:
     uses: ./.github/workflows/publish.yml
     with:
       tag: ${{ needs.prepare.outputs.tag }}
+      publish: ${{ inputs.publish }}

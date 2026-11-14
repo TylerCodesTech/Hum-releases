@@ -4,7 +4,7 @@
 # Called by: release.yml
 
 name: Publish release
-run-name: Publish ${{ inputs.tag }}
+run-name: ${{ inputs.publish && 'Publish' || 'Check' }} ${{ inputs.tag }}
 
 on:
   workflow_call:
@@ -12,11 +12,18 @@ on:
       tag:
         type: string
         required: true
+      publish:
+        type: boolean
+        default: true
   workflow_dispatch:
     inputs:
       tag:
-        description: Tag of the draft release to publish, such as hum-v2026.2.0
+        description: Tag of the draft release to publish, such as hum-v2026.2.1.0
         required: true
+      publish:
+        description: Publish it (turn off to only check the files)
+        type: boolean
+        default: true
 
 permissions:
   contents: write
@@ -30,20 +37,26 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           TAG: ${{ inputs.tag }}
+          PUBLISH: ${{ inputs.publish }}
         run: |
           assets="$(gh release view "$TAG" --json assets --jq '.assets[].name')"
           echo "$assets"
           missing=0
-          for want in 'latest\.json$' '_universal\.dmg$' '-setup\.exe$' '\.msi$' '\.AppImage$' '\.deb$' '\.rpm$'; do
+          for want in '^latest\.json$' '\.dmg$' '\.exe$' '\.msi$' '\.AppImage$' '\.deb$' '\.rpm$' '\.app\.tar\.gz$'; do
             if ! echo "$assets" | grep -Eq "$want"; then
               echo "::error::The release $TAG has no file matching $want"
               missing=1
             fi
           done
           if [ "$missing" -ne 0 ]; then exit 1; fi
-          gh release edit "$TAG" --draft=false --latest
+          if [ "$PUBLISH" = "true" ]; then
+            gh release edit "$TAG" --draft=false --latest
+          else
+            echo "Left $TAG as a draft"
+          fi
   cask:
     needs: publish
+    if: inputs.publish
     uses: ./.github/workflows/cask.yml
     with:
       tag: ${{ inputs.tag }}
