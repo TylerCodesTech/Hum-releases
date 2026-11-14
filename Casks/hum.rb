@@ -1,6 +1,6 @@
 cask "hum" do
-  version "2026.1.2"
-  sha256 "837f637c6359c2a9dbfc42c96f93f052b2879ac726d82cc76ced8c8c4e505f93"
+  version "2026.2.0"
+  sha256 "21013da53bea0aeef1019bb9a61013cb8c1299d1e53f72de05b6cc1c4e9d3189"
 
   url "https://github.com/TylerCodesTech/Hum-releases/releases/download/hum-v#{version}/Hum_#{version}_universal.dmg"
   name "Hum"
