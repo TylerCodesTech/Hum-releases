@@ -1,0 +1,48 @@
+# Author: t.mccall
+# Created Date: 2026-11-14
+# Last Revision: 2026-11-14 by t.mccall
+# Called by: release.yml
+
+name: Publish release
+
+on:
+  workflow_call:
+    inputs:
+      tag:
+        type: string
+        required: true
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Tag of the draft release to publish, such as hum-v2026.2.0
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check the installers and publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          assets="$(gh release view "$TAG" --json assets --jq '.assets[].name')"
+          echo "$assets"
+          missing=0
+          for want in 'latest\.json$' '_universal\.dmg$' '-setup\.exe$' '\.msi$' '\.AppImage$' '\.deb$' '\.rpm$'; do
+            if ! echo "$assets" | grep -Eq "$want"; then
+              echo "::error::The release $TAG has no file matching $want"
+              missing=1
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then exit 1; fi
+          gh release edit "$TAG" --draft=false --latest
+  cask:
+    needs: publish
+    uses: ./.github/workflows/cask.yml
+    with:
+      tag: ${{ inputs.tag }}

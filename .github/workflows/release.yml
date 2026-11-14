@@ -16,7 +16,25 @@ permissions:
   contents: write
 
 jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.version.outputs.tag }}
+    steps:
+      - name: Read the version
+        id: version
+        env:
+          GH_TOKEN: ${{ secrets.HUM_SOURCE_TOKEN }}
+          REF: ${{ inputs.ref }}
+        run: |
+          version="$(gh api "repos/TylerCodesTech/Hum/contents/hum-desktop/package.json?ref=${REF}" -H 'Accept: application/vnd.github.raw' | jq -r .version)"
+          if [ -z "$version" ] || [ "$version" = "null" ]; then
+            echo "::error::Could not read the version from the Hum source"
+            exit 1
+          fi
+          echo "tag=hum-v${version}" >> "$GITHUB_OUTPUT"
   release:
+    needs: prepare
     strategy:
       fail-fast: false
       matrix:
@@ -94,3 +112,8 @@ jobs:
           prerelease: false
           includeUpdaterJson: true
           args: ${{ matrix.args }} --config src-tauri/tauri.ci.conf.json
+  publish:
+    needs: [prepare, release]
+    uses: ./.github/workflows/publish.yml
+    with:
+      tag: ${{ needs.prepare.outputs.tag }}

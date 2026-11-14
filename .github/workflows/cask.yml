@@ -1,13 +1,18 @@
 # Author: t.mccall
 # Created Date: 2026-11-14
 # Last Revision: 2026-11-14 by t.mccall
-# Called by: none
+# Called by: publish.yml
 
 name: Update Homebrew cask
 
 on:
   release:
     types: [published]
+  workflow_call:
+    inputs:
+      tag:
+        type: string
+        required: true
   workflow_dispatch:
     inputs:
       tag:
@@ -19,7 +24,7 @@ permissions:
 
 jobs:
   cask:
-    if: github.event_name == 'workflow_dispatch' || !github.event.release.prerelease
+    if: github.event_name != 'release' || !github.event.release.prerelease
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
