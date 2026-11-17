@@ -1,8 +1,8 @@
 cask "hum" do
-  version "2026.2.2.0"
-  sha256 "a71b197ce12959f107663a1ea51b41fafeee191b8e463d0d034a492541c4a60d"
+  version "2026.2.4.0"
+  sha256 "47c8810c01c9e741055e6d72902c891c2d2bf54729e0e733f9c4e0425e8c814c"
 
-  url "https://github.com/TylerCodesTech/Hum-releases/releases/download/hum-v2026.2.2.0/Hum_2026.2.2.0_darwin_universal.dmg"
+  url "https://github.com/TylerCodesTech/Hum-releases/releases/download/hum-v2026.2.4.0/Hum_2026.2.4.0_darwin_universal.dmg"
   name "Hum"
   desc "Editor for Symitar PowerOn with AI chat and spec task lists"
   homepage "https://github.com/TylerCodesTech/Hum-releases"
