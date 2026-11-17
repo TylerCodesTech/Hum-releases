@@ -1,0 +1,50 @@
+# Author: t.mccall
+# Created Date: 2026-11-17
+# Last Revision: 2026-11-17 by t.mccall
+# Called by: none
+
+name: Watch for a new Hum version
+run-name: Watch for a new Hum version
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+
+permissions:
+  actions: write
+  contents: read
+
+concurrency:
+  group: watch
+  cancel-in-progress: false
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Start a release when the source has a version that was never built
+        env:
+          SOURCE_TOKEN: ${{ secrets.HUM_SOURCE_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          stored="$(GH_TOKEN="$SOURCE_TOKEN" gh api 'repos/TylerCodesTech/Hum/contents/hum-desktop/package.json?ref=main' -H 'Accept: application/vnd.github.raw' | jq -r .version)"
+          if ! [[ "$stored" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Could not read the version from the Hum source"
+            exit 1
+          fi
+          IFS=. read -r year major packed <<< "$stored"
+          shown="${year}.${major}.$((packed / 1000)).$((packed % 1000))"
+          echo "Hum main is at $shown"
+          if gh release view "hum-v${shown}" > /dev/null 2>&1; then
+            echo "Hum $shown already has a release. Nothing to do."
+            exit 0
+          fi
+          earlier="$(gh run list --workflow release.yml --limit 100 --json displayTitle --jq "[.[] | select(.displayTitle == \"Release Hum ${shown}\")] | length")"
+          if [ "$earlier" -ne 0 ]; then
+            echo "A build for Hum $shown was already started. Start it again by hand if it failed."
+            exit 0
+          fi
+          echo "Starting the release build for Hum $shown"
+          gh workflow run release.yml --ref main -f ref=main -f "version=${shown}" -f publish=true
