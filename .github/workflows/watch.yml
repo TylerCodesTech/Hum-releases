@@ -23,7 +23,7 @@ jobs:
   watch:
     runs-on: ubuntu-latest
     steps:
-      - name: Start a release when the source has a version that was never built
+      - name: Start a release when the source has a version that was never released
         env:
           SOURCE_TOKEN: ${{ secrets.HUM_SOURCE_TOKEN }}
           GH_TOKEN: ${{ github.token }}
@@ -41,10 +41,23 @@ jobs:
             echo "Hum $shown already has a release. Nothing to do."
             exit 0
           fi
-          earlier="$(gh run list --workflow release.yml --limit 100 --json displayTitle --jq "[.[] | select(.displayTitle == \"Release Hum ${shown}\")] | length")"
-          if [ "$earlier" -ne 0 ]; then
-            echo "A build for Hum $shown was already started. Start it again by hand if it failed."
+          runs="$(gh run list --workflow release.yml --limit 100 --json displayTitle,status,conclusion,createdAt --jq "[.[] | select(.displayTitle == \"Release Hum ${shown}\")]")"
+          if [ "$(jq '[.[] | select(.status != "completed")] | length' <<< "$runs")" -ne 0 ]; then
+            echo "A build for Hum $shown is running."
             exit 0
+          fi
+          if [ "$(jq '[.[] | select(.conclusion == "success")] | length' <<< "$runs")" -ne 0 ]; then
+            echo "A build for Hum $shown already finished."
+            exit 0
+          fi
+          last="$(jq -r '[.[].createdAt] | max // ""' <<< "$runs")"
+          if [ -n "$last" ]; then
+            changed="$(GH_TOKEN="$SOURCE_TOKEN" gh api 'repos/TylerCodesTech/Hum/commits/main' --jq .commit.committer.date)"
+            if [[ ! "$changed" > "$last" ]]; then
+              echo "The last build for Hum $shown failed and the source has not changed since. Fix the cause in the Hum source, or start Release Hum again by hand."
+              exit 0
+            fi
+            echo "The last build for Hum $shown failed, and the source changed after it. Trying again."
           fi
           echo "Starting the release build for Hum $shown"
           gh workflow run release.yml --ref main -f ref=main -f "version=${shown}" -f publish=true

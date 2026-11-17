@@ -1,6 +1,6 @@
 # Author: t.mccall
 # Created Date: 2026-11-14
-# Last Revision: 2026-11-14 by t.mccall
+# Last Revision: 2026-11-17 by t.mccall
 # Called by: none
 
 name: Release Hum
@@ -29,7 +29,9 @@ jobs:
     outputs:
       tag: ${{ steps.version.outputs.tag }}
       shown: ${{ steps.version.outputs.shown }}
+      body: ${{ steps.notes.outputs.body }}
     steps:
+      - uses: actions/checkout@v4
       - name: Read the version
         id: version
         env:
@@ -51,6 +53,24 @@ jobs:
           echo "Releasing Hum $shown (stored as $stored)"
           echo "shown=${shown}" >> "$GITHUB_OUTPUT"
           echo "tag=hum-v${shown}" >> "$GITHUB_OUTPUT"
+      - name: Check the release notes
+        id: notes
+        env:
+          GH_TOKEN: ${{ secrets.HUM_SOURCE_TOKEN }}
+          REF: ${{ inputs.ref }}
+          SHOWN: ${{ steps.version.outputs.shown }}
+        run: |
+          gh api "repos/TylerCodesTech/Hum/contents/hum-desktop/src/whatsNew.ts?ref=${REF}" -H 'Accept: application/vnd.github.raw' > "$RUNNER_TEMP/whatsNew.ts"
+          if ! node scripts/release-notes.mjs "$RUNNER_TEMP/whatsNew.ts" "$SHOWN" > "$RUNNER_TEMP/body.md" 2> "$RUNNER_TEMP/problem.txt"; then
+            echo "::error::$(cat "$RUNNER_TEMP/problem.txt")"
+            exit 1
+          fi
+          cat "$RUNNER_TEMP/body.md"
+          {
+            echo 'body<<HUM_RELEASE_NOTES_END'
+            cat "$RUNNER_TEMP/body.md"
+            echo 'HUM_RELEASE_NOTES_END'
+          } >> "$GITHUB_OUTPUT"
   release:
     needs: prepare
     strategy:
@@ -126,7 +146,7 @@ jobs:
           tagName: ${{ needs.prepare.outputs.tag }}
           releaseName: Hum ${{ needs.prepare.outputs.shown }}
           assetNamePattern: Hum_${{ needs.prepare.outputs.shown }}_[platform]_[arch][setup][ext]
-          releaseBody: Download the installer for your computer below. Copies of Hum that are already installed update themselves.
+          releaseBody: ${{ needs.prepare.outputs.body }}
           releaseDraft: true
           prerelease: false
           includeUpdaterJson: true
